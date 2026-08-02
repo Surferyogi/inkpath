@@ -1,4 +1,4 @@
-/* Ink Path service worker — v2026:08:02-21:06
+/* Ink Path service worker — v2026:08:02-23:55
    Strategy:
    - Navigations: network-first, cache fallback (offline shell).
    - Same-origin static assets + Google Fonts: cache-first (stale-while-revalidate-lite).
