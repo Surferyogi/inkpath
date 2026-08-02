@@ -1,0 +1,16 @@
+{
+  "name": "墨径 Ink Path — learn hanzi & kanji",
+  "short_name": "Ink Path",
+  "description": "A quiz game for learning Mandarin Chinese hanzi and Japanese kana/kanji, with adaptive rounds, analytics and example sentences.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0E1322",
+  "theme_color": "#141A2E",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
