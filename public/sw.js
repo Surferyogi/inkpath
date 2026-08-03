@@ -1,10 +1,10 @@
-/* Ink Path service worker — v2026:08:03-21:12
+/* Ink Path service worker — v2026:08:04-02:27
    Strategy:
    - Navigations: network-first, cache fallback (offline shell).
    - Same-origin static assets + Google Fonts: cache-first (stale-while-revalidate-lite).
    - Everything else (API calls, POST): passthrough, never cached.
 */
-const CACHE = "inkpath-v2026-08-03-2112";
+const CACHE = "inkpath-v2026-08-04-0227";
 const CORE = ["./", "./index.html", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png"];
 
