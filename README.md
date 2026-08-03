@@ -1,4 +1,4 @@
-# 墨径 Ink Path — PWA (v2026:08:02-21:06)
+# 墨径 Ink Path — PWA (v2026:08:03-11:41)
 
 Quiz game for learning Mandarin Chinese hanzi (Simplified, Hanyu Pinyin) and
 Japanese kana/kanji (romaji), with adaptive rounds, per-character analytics,
@@ -92,3 +92,9 @@ a shared-secret header check inside the function.
 ## Versioning
 App version lives in `src/App.jsx` (`VERSION`) and the service-worker cache
 name in `public/sw.js`. Bump both on release so clients pick up new builds.
+
+## Auto-deploy (GitHub Actions)
+Every push to `main` builds and publishes automatically via
+`.github/workflows/deploy.yml`. One-time setup: Settings → Pages →
+Source: **GitHub Actions**. After that, uploading files on GitHub is the
+entire release process — no local build needed.
