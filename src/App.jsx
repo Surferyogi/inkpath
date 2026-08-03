@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
 /*
-  墨径 INK PATH — v2026:08:03-11:41 (SGT) — PWA build
+  墨径 INK PATH — v2026:08:03-20:19 (SGT) — PWA build
   Mandarin Chinese (Simplified, Hanyu Pinyin) + Japanese (kana/kanji, romaji).
 
   Data honesty:
@@ -21,7 +21,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
     "AI not configured" instead of failing silently.
 */
 
-const VERSION = "v2026:08:03-11:41";
+const VERSION = "v2026:08:03-20:19";
 
 /* Set this to your deployed proxy, e.g.
    "https://<project-ref>.functions.supabase.co/claude-proxy"
@@ -585,8 +585,8 @@ async function callClaude(prompt) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
     });
-    if (!res.ok) throw new Error(`proxy ${res.status}`);
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || data.error || `proxy ${res.status}`);
     if (!data.text) throw new Error("proxy returned no text");
     return data.text.replace(/```json|```/g, "").trim();
   }
@@ -760,7 +760,7 @@ export default function InkPath() {
   }, [progress]);
 
   return (
-    <div style={S.root}>
+    <div style={S.root} className="approot">
       <style>{CSS}</style>
       {screen === "home" && (
         <Home progress={progress} loaded={loaded} aiBusy={aiBusy} aiError={aiError}
@@ -1058,7 +1058,7 @@ function Play({ lang, info, sentCache, cacheSentence, mnemCache, cacheMnemonic, 
       const s = await aiSentence(lang, q.item);
       cacheSentence(lang, q.item.char, s);
       setSent({ state: "ok", data: s });
-    } catch { setSent({ state: "err" }); }
+    } catch (e) { setSent({ state: "err", msg: e.message }); }
   };
 
   const showMnemonic = async () => {
@@ -1069,7 +1069,7 @@ function Play({ lang, info, sentCache, cacheSentence, mnemCache, cacheMnemonic, 
       const m = await aiMnemonic(lang, q.item);
       cacheMnemonic(lang, q.item.char, m);
       setMnem({ state: "ok", data: m });
-    } catch { setMnem({ state: "err" }); }
+    } catch (e) { setMnem({ state: "err", msg: e.message }); }
   };
 
   const isChar = q.promptField === "char";
@@ -1149,7 +1149,7 @@ function Play({ lang, info, sentCache, cacheSentence, mnemCache, cacheMnemonic, 
             ) : sent.state === "loading" ? (
               <div style={S.exampleBox}>Generating example…</div>
             ) : sent.state === "err" ? (
-              <div style={S.exampleBox}>Example unavailable (AI call failed).</div>
+              <div style={S.exampleBox}>Example unavailable — {sent.msg || "AI call failed"}.</div>
             ) : (
               <div style={S.exampleBox}>
                 <div style={{ fontFamily: lv.font, fontSize: 20 }}>{sent.data.t}</div>
@@ -1165,7 +1165,7 @@ function Play({ lang, info, sentCache, cacheSentence, mnemCache, cacheMnemonic, 
           ) : mnem.state === "loading" ? (
             <div style={S.exampleBox}>Building memory aid…</div>
           ) : mnem.state === "err" ? (
-            <div style={S.exampleBox}>Memory aid unavailable (AI call failed).</div>
+            <div style={S.exampleBox}>Memory aid unavailable — {mnem.msg || "AI call failed"}.</div>
           ) : (
             <div style={S.exampleBox}>
               {PARTS[q.item.char] && (
@@ -1592,6 +1592,12 @@ const S = {
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&family=Noto+Serif+JP:wght@600;900&family=Karla:wght@400;500;700&display=swap');
+@supports (padding: env(safe-area-inset-top)) {
+  .approot {
+    padding-top: calc(16px + env(safe-area-inset-top)) !important;
+    padding-bottom: calc(48px + env(safe-area-inset-bottom)) !important;
+  }
+}
 button:focus-visible { outline: 2px solid ${T.gold}; outline-offset: 2px; }
 .tierBtn:hover:not(:disabled), .opt:hover:not(:disabled), .quiet:hover { border-color: ${T.gold}; transform: translateY(-1px); }
 .quiet { transition: transform .15s ease, border-color .15s ease; }
