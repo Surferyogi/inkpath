@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
 /*
-  墨径 INK PATH — v2026:08:03-20:19 (SGT) — PWA build
+  墨径 INK PATH — v2026:08:03-21:12 (SGT) — PWA build
   Mandarin Chinese (Simplified, Hanyu Pinyin) + Japanese (kana/kanji, romaji).
 
   Data honesty:
@@ -21,7 +21,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
     "AI not configured" instead of failing silently.
 */
 
-const VERSION = "v2026:08:03-20:19";
+const VERSION = "v2026:08:03-21:12";
 
 /* Set this to your deployed proxy, e.g.
    "https://<project-ref>.functions.supabase.co/claude-proxy"
@@ -67,7 +67,7 @@ const PARTS = {
   "明": [["日","sun"],["月","moon"]],
   "好": [["女","woman"],["子","child"]],
   "休": [["亻","person"],["木","tree"]],
-  "听": [["口","mouth"],["斤","axe"]],
+  "听": [["口","mouth"],["斤","axe; pound (weight unit)"]],
   "看": [["手","hand"],["目","eye"]],
   "安": [["宀","roof"],["女","woman"]],
   "家": [["宀","roof"],["豕","pig"]],
@@ -268,6 +268,27 @@ function masteredCount(langKey, cs) {
   ).length;
 }
 
+/* Per-language reading lookup (core pools + zh families) for analytics rows.
+   AI-introduced characters fall back to the reading recorded when answered. */
+/* Standalone readings for common components not in the quiz pools — per language. */
+const COMPONENT_READINGS_ZH = {
+  "斤":"jīn","女":"nǚ","子":"zǐ","力":"lì","寸":"cùn","音":"yīn","青":"qīng","言":"yán",
+  "耳":"ěr","禾":"hé","豕":"shǐ","穴":"xué","每":"měi","化":"huà","也":"yě","尔":"ěr",
+  "交":"jiāo","几":"jī","兑":"duì","义":"yì","只":"zhǐ","京":"jīng","曼":"màn","今":"jīn",
+  "相":"xiāng","孝":"xiào","舌":"shé",
+};
+const COMPONENT_READINGS_JA = {
+  "言":"gen","耳":"mimi","門":"mon","舌":"shita","売":"bai","動":"dō","吾":"go",
+};
+const compReading = (langKey, ch) =>
+  READING_MAP[langKey]?.[ch] ||
+  (langKey === "zh" ? COMPONENT_READINGS_ZH[ch] : COMPONENT_READINGS_JA[ch]) ||
+  null;
+
+const READING_MAP = { zh: {}, ja: {} };
+for (const [lk, lv] of Object.entries(LANGS))
+  for (const t of lv.tiers) for (const row of t.data) READING_MAP[lk][row[0]] = row[1];
+
 const MODES = ["charToMeaning", "meaningToChar", "charToReading", "readingToChar"];
 const MODE_LABEL = {
   charToMeaning: "Recognition (char → meaning)",
@@ -415,6 +436,14 @@ const FAMILIES = [
   },
 ];
 
+const CHAR_FAMILY_BASE = {};
+for (const fam of FAMILIES)
+  for (const g of fam.groups)
+    for (const m of g.members) {
+      CHAR_FAMILY_BASE[m.c] = fam.base;
+      if (!READING_MAP.zh[m.c]) READING_MAP.zh[m.c] = m.py;
+    }
+
 function familyItems(fam, includeRare) {
   return fam.groups.flatMap((g) => g.members)
     .filter((m) => includeRare || !m.rare)
@@ -475,8 +504,32 @@ function buildTierRound(items, cs, langKey) {
    3. Any remaining slots: weakness-weighted from the whole pool. */
 function buildAdaptiveRound(langKey, cs, weakestMode) {
   const now = Date.now();
-  const pool = LANGS[langKey].tiers.flatMap((t) => t.data.map(toItem));
+  let pool = LANGS[langKey].tiers.flatMap((t) => t.data.map(toItem));
+  if (langKey === "zh") {
+    const have = new Set(pool.map((it) => it.char));
+    for (const fam of FAMILIES)
+      for (const it of familyItems(fam, false))
+        if (!have.has(it.char)) { pool.push(it); have.add(it.char); }
+  }
+  const poolChars = new Set(pool.map((it) => it.char));
   const stat = (it) => cs[`${langKey}|${it.char}`];
+  const learnedCh = (ch) => isLearned(cs[`${langKey}|${ch}`]);
+  /* Connection-driven ordering for NEW characters:
+     3 = foundations (pictographs / family bases) OR every learnable component already learned
+     2.5 = its family base is learned  ·  2 = some component learned  ·  1 = no connection yet */
+  const readiness = (it) => {
+    const base = CHAR_FAMILY_BASE[it.char];
+    if (PICTO[it.char] || base === it.char) return 3;
+    let s = 1;
+    if (base && learnedCh(base)) s = Math.max(s, 2.5);
+    const parts = PARTS[it.char];
+    if (parts) {
+      const inPool = parts.map((p) => p[0]).filter((ch) => poolChars.has(ch));
+      if (inPool.length && inPool.every(learnedCh)) s = Math.max(s, 3);
+      else if (inPool.some(learnedCh)) s = Math.max(s, 2);
+    }
+    return s;
+  };
 
   const due = pool
     .filter((it) => isDue(stat(it), now))
@@ -486,7 +539,10 @@ function buildAdaptiveRound(langKey, cs, weakestMode) {
       if (accA !== accB) return accA - accB;      // weakest first
       return (sa.t || 0) - (sb.t || 0);            // then most overdue
     });
-  const fresh = shuffle(pool.filter((it) => !stat(it) || !stat(it).a));
+  const fresh = shuffle(pool.filter((it) => !stat(it) || !stat(it).a))
+    .map((it) => ({ it, rd: readiness(it) }))
+    .sort((a, b) => b.rd - a.rd)
+    .map((x) => x.it);
 
   const picks = [];
   const used = new Set();
@@ -621,11 +677,11 @@ async function aiMnemonic(langKey, item) {
   const parts = PARTS[item.char];
   const picto = PICTO[item.char];
   const facts = parts
-    ? `Its ACTUAL components are exactly: ${parts.map((p) => `${p[0]} (${p[1]})`).join(" + ")}. Build the scene ONLY from these real components — do not add any others.`
+    ? `Its ACTUAL components are exactly: ${parts.map((p) => { const r = compReading(langKey, p[0]); return `${p[0]}${r ? ` (${r})` : ""} meaning "${p[1]}"`; }).join(" + ")}. FIRST name each component with its reading and meaning in one short line (e.g. "口 kǒu mouth + 斤 jīn pound"), THEN build ONE scene ONLY from these real components — do not add any others.`
     : picto
     ? `It is a true pictograph: originally a drawing of ${picto}. Build the scene from that image.`
     : `If you are not fully certain of its real components, describe its overall visual shape instead — NEVER invent components that are not actually in the character.`;
-  const prompt = `Create a visual mnemonic for remembering the ${zh ? "Mandarin Chinese (Simplified) character" : "Japanese character"} "${item.char}" (${item.reading}${item.meaning ? ", meaning: " + item.meaning : ""}). ${facts} Paint ONE vivid, memorable scene that links the shape to ${item.meaning ? "its meaning" : "its sound"}, ending with a short hint for the ${zh ? "pinyin" : "reading"}. Max 55 words. Respond ONLY with JSON {"m":"mnemonic text"}. No markdown.`;
+  const prompt = `Create a visual mnemonic for remembering the ${zh ? "Mandarin Chinese (Simplified) character" : "Japanese character"} "${item.char}" (${item.reading}${item.meaning ? ", meaning: " + item.meaning : ""}). ${facts} Then paint ONE vivid, memorable scene that links the components to ${item.meaning ? "its meaning" : "its sound"}, ending with a short hint for the ${zh ? "pinyin" : "reading"}. Max 75 words. Respond ONLY with JSON {"m":"mnemonic text"}. No markdown.`;
   const raw = await callClaude(prompt);
   const o = JSON.parse(raw);
   if (!o.m) throw new Error("bad shape");
@@ -734,6 +790,7 @@ export default function InkPath() {
           u: (cur.u || 0) + (log.unsure ? 1 : 0),
           b: log.ok ? Math.min((cur.b || 0) + 1, 5) : 1, // Leitner: up a box, or back to 1
           t: Date.now(),
+          r: log.r || cur.r,
         };
         const mm = msLang[log.mode] || { a: 0, c: 0 };
         msLang[log.mode] = { a: mm.a + 1, c: mm.c + (log.ok ? 1 : 0) };
@@ -778,7 +835,7 @@ export default function InkPath() {
           onAI={(a) => startAI(lang, a)} />
       )}
       {screen === "play" && (
-        <Play lang={lang} info={roundInfo} sentCache={sentCache} cacheSentence={cacheSentence} mnemCache={mnemCache} cacheMnemonic={cacheMnemonic}
+        <Play lang={lang} info={roundInfo} sentCache={sentCache} cacheSentence={cacheSentence} mnemCache={mnemCache} cacheMnemonic={cacheMnemonic} csView={progress.cs}
           onQuit={() => setScreen("home")} onFinish={finish} />
       )}
       {screen === "results" && (
@@ -909,8 +966,8 @@ function Stats({ langKey, progress, onBack, onSmart, onAI, aiBusy, aiError }) {
           </div>
 
           <div style={S.twoCol}>
-            <CharList title="Needs work" chars={a.weakest} color={T.vermilion} font={lv.font} empty="Nothing needs work yet — every answer so far has been correct." />
-            <CharList title="Strong" chars={a.strongest} color="#4C8C4A" font={lv.font} empty="Need ≥2 attempts per character to rank." />
+            <CharList title="Needs work" chars={a.weakest} color={T.vermilion} font={lv.font} langKey={langKey} empty="Nothing needs work yet — every answer so far has been correct." />
+            <CharList title="Strong" chars={a.strongest} color="#4C8C4A" font={lv.font} langKey={langKey} empty="Need ≥2 attempts per character to rank." />
           </div>
 
           <div style={S.paperCardLeft}>
@@ -969,7 +1026,7 @@ const StatCard = ({ n, l }) => (
   </div>
 );
 
-const CharList = ({ title, chars, color, font, empty }) => (
+const CharList = ({ title, chars, color, font, empty, langKey }) => (
   <div style={S.paperCardLeft}>
     <div style={{ ...S.sectionHead, color }}>{title}</div>
     {chars.length === 0 ? (
@@ -977,7 +1034,10 @@ const CharList = ({ title, chars, color, font, empty }) => (
     ) : chars.map((c) => (
       <div key={c.char} style={S.charRow}>
         <span style={{ fontFamily: font, fontSize: 26, minWidth: 38 }}>{c.char}</span>
-        <span style={{ color: T.inkGrey, fontSize: 13 }}>{c.c}/{c.a} correct{c.u ? ` · ${c.u}× unsure` : ""}</span>
+        <span style={{ color: T.inkGrey, fontSize: 13 }}>
+          <span style={{ color: T.ink, fontWeight: 600 }}>{READING_MAP[langKey]?.[c.char] || c.r || "—"}</span>
+          {"  "}· {c.c}/{c.a} correct{c.u ? ` · ${c.u}× unsure` : ""}
+        </span>
         <span style={{ marginLeft: "auto", fontWeight: 700, color }}>{pct(c.acc)}</span>
       </div>
     ))}
@@ -986,7 +1046,7 @@ const CharList = ({ title, chars, color, font, empty }) => (
 
 /* ================= PLAY ================= */
 
-function Play({ lang, info, sentCache, cacheSentence, mnemCache, cacheMnemonic, onQuit, onFinish }) {
+function Play({ lang, info, sentCache, cacheSentence, mnemCache, cacheMnemonic, csView, onQuit, onFinish }) {
   const lv = LANGS[lang];
   const round = info.round;
   const [idx, setIdx] = useState(0);
@@ -1006,7 +1066,7 @@ function Play({ lang, info, sentCache, cacheSentence, mnemCache, cacheMnemonic, 
   useEffect(() => { setSent(null); setMnem(null); }, [idx]);
 
   const record = (ok, unsure) => {
-    setLog((l) => [...l, { char: q.item.char, mode: q.mode, ok, unsure }]);
+    setLog((l) => [...l, { char: q.item.char, r: q.item.reading, mode: q.mode, ok, unsure }]);
   };
 
   const choose = (opt) => {
@@ -1142,6 +1202,19 @@ function Play({ lang, info, sentCache, cacheSentence, mnemCache, cacheMnemonic, 
             {"  "}— {q.item.reading}{q.item.meaning ? ` — ${q.item.meaning}` : ""}
             {/* "not sure" is still logged for review and costs no heart — note intentionally not shown */}
           </div>
+          {PARTS[q.item.char] && (
+            <div style={{ fontSize: 13, color: T.paperDim, textAlign: "center" }}>
+              builds on:{" "}
+              {PARTS[q.item.char].map((p, i) => (
+                <span key={i} style={{ marginRight: 8 }}>
+                  <span style={{ fontFamily: lv.font, fontSize: 17, color: T.paper }}>{p[0]}</span>
+                  <span style={{ color: isLearned(csView[`${lang}|${p[0]}`]) ? "#6FA96C" : T.paperDim }}>
+                    {isLearned(csView[`${lang}|${p[0]}`]) ? " ✓" : ""}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
 
           {q.item.meaning !== null && (
             sent === null ? (
@@ -1161,27 +1234,32 @@ function Play({ lang, info, sentCache, cacheSentence, mnemCache, cacheMnemonic, 
           )}
 
           {mnem === null ? (
-            <button className="quiet" style={S.exampleBtn} onClick={showMnemonic}>🧠 Memory aid (stroke order + mnemonic)</button>
-          ) : mnem.state === "loading" ? (
-            <div style={S.exampleBox}>Building memory aid…</div>
-          ) : mnem.state === "err" ? (
-            <div style={S.exampleBox}>Memory aid unavailable — {mnem.msg || "AI call failed"}.</div>
+            <button className="quiet" style={S.exampleBtn} onClick={showMnemonic}>🧠 Memory aid (composition + stroke order + mnemonic)</button>
           ) : (
             <div style={S.exampleBox}>
               {PARTS[q.item.char] && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
-                  {PARTS[q.item.char].map((p, i) => (
-                    <span key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      {i > 0 && <span style={{ color: T.gold, fontSize: 20 }}>+</span>}
-                      <span style={{ textAlign: "center" }}>
-                        <span style={{ display: "block", fontFamily: lv.font, fontSize: 34 }}>{p[0]}</span>
-                        <span style={{ fontSize: 11, color: T.paperDim }}>{p[1]}</span>
+                <>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+                    {PARTS[q.item.char].map((p, i) => (
+                      <span key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        {i > 0 && <span style={{ color: T.gold, fontSize: 20 }}>+</span>}
+                        <span style={{ textAlign: "center" }}>
+                          <span style={{ display: "block", fontFamily: lv.font, fontSize: 34 }}>{p[0]}</span>
+                          <span style={{ fontSize: 11, color: T.gold }}>{compReading(lang, p[0]) || "\u00A0"}</span>
+                          <span style={{ display: "block", fontSize: 11, color: T.paperDim }}>{p[1]}</span>
+                        </span>
                       </span>
-                    </span>
-                  ))}
-                  <span style={{ color: T.gold, fontSize: 20 }}>→</span>
-                  <span style={{ fontFamily: lv.font, fontSize: 40 }}>{q.item.char}</span>
-                </div>
+                    ))}
+                    <span style={{ color: T.gold, fontSize: 20 }}>→</span>
+                    <span style={{ fontFamily: lv.font, fontSize: 40 }}>{q.item.char}</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: T.paper, textAlign: "center" }}>
+                    {q.item.char} is made of {PARTS[q.item.char].map((p, i) => {
+                      const r = compReading(lang, p[0]);
+                      return `${i > 0 ? " + " : ""}${p[0]}${r ? ` ${r}` : ""} (${p[1]})`;
+                    }).join("")}
+                  </div>
+                </>
               )}
               {!PARTS[q.item.char] && PICTO[q.item.char] && (
                 <div style={{ fontSize: 13, color: T.gold, textAlign: "center" }}>
@@ -1189,8 +1267,18 @@ function Play({ lang, info, sentCache, cacheSentence, mnemCache, cacheMnemonic, 
                 </div>
               )}
               <StrokeAnim char={q.item.char} />
-              <div style={{ fontSize: 14, lineHeight: 1.55 }}>{mnem.data}</div>
-              <div style={S.aiSmall}>AI-generated mnemonic · stroke data: Hanzi Writer</div>
+              {mnem.state === "loading" ? (
+                <div style={{ fontSize: 13, color: T.paperDim }}>Generating mnemonic story…</div>
+              ) : mnem.state === "err" ? (
+                <div style={{ fontSize: 13, color: T.paperDim, textAlign: "center" }}>
+                  Mnemonic story unavailable — {mnem.msg || "AI call failed"}. The composition above is verified data.
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 14, lineHeight: 1.55 }}>{mnem.data}</div>
+                  <div style={S.aiSmall}>AI-generated mnemonic · stroke data: Hanzi Writer</div>
+                </>
+              )}
             </div>
           )}
 
