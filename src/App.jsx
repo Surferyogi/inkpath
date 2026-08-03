@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 
 /*
-  墨径 INK PATH — v2026:08:03-21:12 (SGT) — PWA build
+  墨径 INK PATH — v2026:08:04-02:27 (SGT) — PWA build
   Mandarin Chinese (Simplified, Hanyu Pinyin) + Japanese (kana/kanji, romaji).
 
   Data honesty:
@@ -21,7 +21,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
     "AI not configured" instead of failing silently.
 */
 
-const VERSION = "v2026:08:03-21:12";
+const VERSION = "v2026:08:04-02:27";
 
 /* Set this to your deployed proxy, e.g.
    "https://<project-ref>.functions.supabase.co/claude-proxy"
@@ -359,26 +359,26 @@ const FAMILIES = [
     intro: "One square shape, many characters — trained by telling the lookalikes apart.",
     groups: [
       { label: "Closed squares (bigger or divided)", members: [
-        { c: "口", py: "kǒu", m: "mouth", note: "the base form — an open mouth" },
-        { c: "囗", py: "wéi", m: "enclosure", note: "same shape drawn large, to border what's inside", rare: true },
-        { c: "日", py: "rì", m: "sun; day", note: "a line through the middle" },
-        { c: "田", py: "tián", m: "field", note: "divided into four plots by a cross" },
-        { c: "回", py: "huí", m: "to return", note: "a small mouth inside a larger one" },
-        { c: "目", py: "mù", m: "eye", note: "stretched tall, two lines inside" },
-        { c: "自", py: "zì", m: "self", note: "an eye with a stroke on top — originally a nose" },
+        { c: "口", py: "kǒu", ja: "kuchi / kō", m: "mouth", note: "the base form — an open mouth" },
+        { c: "囗", py: "wéi", ja: "(rare in JP)", m: "enclosure", note: "same shape drawn large, to border what's inside", rare: true },
+        { c: "日", py: "rì", ja: "hi / nichi", m: "sun; day", note: "a line through the middle" },
+        { c: "田", py: "tián", ja: "ta / den", m: "field", note: "divided into four plots by a cross" },
+        { c: "回", py: "huí", ja: "mawaru / kai", m: "to return", note: "a small mouth inside a larger one" },
+        { c: "目", py: "mù", ja: "me / moku", m: "eye", note: "stretched tall, two lines inside" },
+        { c: "自", py: "zì", ja: "mizukara / ji", m: "self", note: "an eye with a stroke on top — originally a nose" },
       ]},
       { label: "Stacking the mouth", members: [
-        { c: "吕", py: "lǚ", m: "spine; pitch", note: "two mouths stacked — originally vertebrae" },
-        { c: "品", py: "pǐn", m: "product; quality", note: "three mouths — many items, many voices" },
-        { c: "吅", py: "xuān", m: "clamor", note: "two mouths side by side — shouting", rare: true },
-        { c: "㗊", py: "jí", m: "mass of voices", note: "four mouths — absolute chaos", rare: true },
+        { c: "吕", py: "lǚ", ja: "JP form 呂 ro", m: "spine; pitch", note: "two mouths stacked — originally vertebrae" },
+        { c: "品", py: "pǐn", ja: "shina / hin", m: "product; quality", note: "three mouths — many items, many voices" },
+        { c: "吅", py: "xuān", ja: "(not used in JP)", m: "clamor", note: "two mouths side by side — shouting", rare: true },
+        { c: "㗊", py: "jí", ja: "(not used in JP)", m: "mass of voices", note: "four mouths — absolute chaos", rare: true },
       ]},
       { label: "Mouth with small modifications", members: [
-        { c: "中", py: "zhōng", m: "middle", note: "pierced straight through the center" },
-        { c: "申", py: "shēn", m: "to extend; state", note: "the line pokes out top AND bottom" },
-        { c: "由", py: "yóu", m: "from; origin", note: "the line pokes out the top only" },
-        { c: "甲", py: "jiǎ", m: "armor; first", note: "the line pokes out the bottom only" },
-        { c: "舌", py: "shé", m: "tongue", note: "a tongue (千) sticking out of the mouth" },
+        { c: "中", py: "zhōng", ja: "naka / chū", m: "middle", note: "pierced straight through the center" },
+        { c: "申", py: "shēn", ja: "mōsu / shin", m: "to extend; state", note: "the line pokes out top AND bottom" },
+        { c: "由", py: "yóu", ja: "yoshi / yu", m: "from; origin", note: "the line pokes out the top only" },
+        { c: "甲", py: "jiǎ", ja: "kō / kabuto", m: "armor; first", note: "the line pokes out the bottom only" },
+        { c: "舌", py: "shé", ja: "shita / zetsu", m: "tongue", note: "a tongue (千) sticking out of the mouth" },
       ]},
     ],
   },
@@ -387,16 +387,16 @@ const FAMILIES = [
     intro: "One tree — mark its roots, its tip, or plant more of them.",
     groups: [
       { label: "Marking the tree", members: [
-        { c: "木", py: "mù", m: "tree; wood", note: "the base form — trunk, branches, roots" },
-        { c: "本", py: "běn", m: "root; origin", note: "a stroke marking the base of the trunk" },
-        { c: "末", py: "mò", m: "tip; end", note: "a LONG stroke across the top — the treetop" },
-        { c: "未", py: "wèi", m: "not yet", note: "a SHORT top stroke — the tip not yet grown" },
-        { c: "果", py: "guǒ", m: "fruit; result", note: "something round grown on top of the tree" },
+        { c: "木", py: "mù", ja: "ki / moku", m: "tree; wood", note: "the base form — trunk, branches, roots" },
+        { c: "本", py: "běn", ja: "moto / hon", m: "root; origin", note: "a stroke marking the base of the trunk" },
+        { c: "末", py: "mò", ja: "sue / matsu", m: "tip; end", note: "a LONG stroke across the top — the treetop" },
+        { c: "未", py: "wèi", ja: "mada / mi", m: "not yet", note: "a SHORT top stroke — the tip not yet grown" },
+        { c: "果", py: "guǒ", ja: "kudamono / ka", m: "fruit; result", note: "something round grown on top of the tree" },
       ]},
       { label: "Planting more trees", members: [
-        { c: "林", py: "lín", m: "woods", note: "two trees side by side" },
-        { c: "森", py: "sēn", m: "forest", note: "three trees — dense growth" },
-        { c: "休", py: "xiū", m: "to rest", note: "a person (亻) leaning against a tree" },
+        { c: "林", py: "lín", ja: "hayashi / rin", m: "woods", note: "two trees side by side" },
+        { c: "森", py: "sēn", ja: "mori / shin", m: "forest", note: "three trees — dense growth" },
+        { c: "休", py: "xiū", ja: "yasumu / kyū", m: "to rest", note: "a person (亻) leaning against a tree" },
       ]},
     ],
   },
@@ -405,16 +405,16 @@ const FAMILIES = [
     intro: "A walking figure — add strokes and the person transforms.",
     groups: [
       { label: "One person, small changes", members: [
-        { c: "人", py: "rén", m: "person", note: "the base form — a figure striding" },
-        { c: "入", py: "rù", m: "to enter", note: "the lookalike trap: strokes cross the other way" },
-        { c: "大", py: "dà", m: "big", note: "a person with arms stretched wide" },
-        { c: "太", py: "tài", m: "too; greatest", note: "big, plus a dot — even bigger" },
-        { c: "天", py: "tiān", m: "sky; day", note: "a line above the person — the sky overhead" },
-        { c: "夫", py: "fū", m: "man; husband", note: "a line THROUGH the person — a hairpin of adulthood" },
+        { c: "人", py: "rén", ja: "hito / jin", m: "person", note: "the base form — a figure striding" },
+        { c: "入", py: "rù", ja: "hairu / nyū", m: "to enter", note: "the lookalike trap: strokes cross the other way" },
+        { c: "大", py: "dà", ja: "ōkii / dai", m: "big", note: "a person with arms stretched wide" },
+        { c: "太", py: "tài", ja: "futoi / tai", m: "too; greatest", note: "big, plus a dot — even bigger" },
+        { c: "天", py: "tiān", ja: "ten / ama", m: "sky; day", note: "a line above the person — the sky overhead" },
+        { c: "夫", py: "fū", ja: "otto / fu", m: "man; husband", note: "a line THROUGH the person — a hairpin of adulthood" },
       ]},
       { label: "More people", members: [
-        { c: "从", py: "cóng", m: "to follow; from", note: "one person following another" },
-        { c: "众", py: "zhòng", m: "crowd; many", note: "three people — a crowd" },
+        { c: "从", py: "cóng", ja: "JP form 従 shitagau", m: "to follow; from", note: "one person following another" },
+        { c: "众", py: "zhòng", ja: "JP form 衆 shū", m: "crowd; many", note: "three people — a crowd" },
       ]},
     ],
   },
@@ -423,14 +423,14 @@ const FAMILIES = [
     intro: "Horizontal strokes on a vertical — tiny differences, different worlds.",
     groups: [
       { label: "Earth and scholar", members: [
-        { c: "土", py: "tǔ", m: "earth; soil", note: "the base form — a mound on the ground; bottom stroke longer" },
-        { c: "士", py: "shì", m: "scholar; warrior", note: "the trap: TOP stroke longer" },
-        { c: "生", py: "shēng", m: "life; to be born", note: "a sprout growing out of the earth" },
+        { c: "土", py: "tǔ", ja: "tsuchi / do", m: "earth; soil", note: "the base form — a mound on the ground; bottom stroke longer" },
+        { c: "士", py: "shì", ja: "shi", m: "scholar; warrior", note: "the trap: TOP stroke longer" },
+        { c: "生", py: "shēng", ja: "ikiru / sei", m: "life; to be born", note: "a sprout growing out of the earth" },
       ]},
       { label: "King and jade", members: [
-        { c: "王", py: "wáng", m: "king", note: "three levels — heaven, man, earth — joined by one line" },
-        { c: "玉", py: "yù", m: "jade", note: "a king with a dot — the jade at his belt" },
-        { c: "主", py: "zhǔ", m: "master; main", note: "a dot ABOVE the king — the flame of a lamp; the one in charge" },
+        { c: "王", py: "wáng", ja: "ō", m: "king", note: "three levels — heaven, man, earth — joined by one line" },
+        { c: "玉", py: "yù", ja: "tama / gyoku", m: "jade", note: "a king with a dot — the jade at his belt" },
+        { c: "主", py: "zhǔ", ja: "nushi / shu", m: "master; main", note: "a dot ABOVE the king — the flame of a lamp; the one in charge" },
       ]},
     ],
   },
@@ -1306,15 +1306,15 @@ const ORIGIN10 = [
   ["门","mén","mon (kanji: 門)","a door frame with two swinging panels","door; gate"],
 ];
 const ORIGIN_COMPOUNDS = [
-  ["木 + 木","林","lín — woods: two trees side by side"],
-  ["木 + 木 + 木","森","sēn — forest: three trees, dense growth"],
-  ["日 + 月","明","míng — bright: sun and moon, the two brightest things"],
-  ["亻 + 木","休","xiū / yasumu — rest: a person leaning on a tree"],
-  ["門 + 耳","聞","kiku (JP) — to hear: an ear at the gate"],
-  ["门 + 日","间","jiān — between: sunlight through a doorway"],
-  ["火 + 山","火山","huǒshān — volcano: a fire mountain"],
-  ["人 + 口","人口","rénkǒu — population: mouths to feed"],
-  ["门 + 口","门口","ménkǒu — doorway: the mouth of a door"],
+  ["木 + 木","林","lín","hayashi / rin","woods: two trees side by side"],
+  ["木 + 木 + 木","森","sēn","mori / shin","forest: three trees, dense growth"],
+  ["日 + 月","明","míng","akarui / mei","bright: sun and moon, the two brightest things"],
+  ["亻 + 木","休","xiū","yasumu / kyū","rest: a person leaning on a tree"],
+  ["門 + 耳","聞","(JP only)","kiku / bun","to hear: an ear at the gate"],
+  ["门 + 日","间 / 間","jiān","aida / kan","between: sunlight through a doorway"],
+  ["火 + 山","火山","huǒshān","kazan","volcano: a fire mountain"],
+  ["人 + 口","人口","rénkǒu","jinkō","population: mouths to feed"],
+  ["門 + 口","门口 / 門口","ménkǒu","(ZH word)","doorway: the mouth of a door"],
 ];
 const ORIGIN_RADICALS = [
   ["水","氵","three drops of water — left side of liquid words","江 river · 洗 wash"],
@@ -1370,8 +1370,9 @@ function Families({ cs, onBack, onTrain }) {
                 <div key={m.c} style={S.charRow}>
                   <span style={{ fontFamily: font, fontSize: 34, minWidth: 48 }}>{unlocked ? m.c : "？"}</span>
                   <span style={{ flex: 1 }}>
-                    <b>{unlocked ? m.m : "—"}</b> {unlocked && <span style={{ color: T.inkGrey }}>· {m.py}</span>}
-                    {learned && <span style={{ color: "#4C8C4A" }}> ✓ learned</span>}
+                    <b>{unlocked ? m.m : "—"}</b>
+                    {unlocked && <span style={{ color: T.inkGrey }}> · {m.py}{m.ja ? ` / ${m.ja}` : ""}</span>}
+                    {unlocked && learned && <span style={{ color: "#4C8C4A" }}> ✓ learned</span>}
                     {m.rare && unlocked && <span style={{ color: T.vermilion, fontSize: 11 }}> · rare — shape logic only</span>}
                     {unlocked && <span style={{ display: "block", fontSize: 12, color: T.inkGrey }}>{m.note}</span>}
                   </span>
@@ -1419,12 +1420,15 @@ function Origins({ langKey, onBack }) {
 
       <div style={S.paperCardLeft}>
         <div style={S.sectionHead}>2 · Combine pictures into ideas</div>
-        {ORIGIN_COMPOUNDS.map(([eq, res, note]) => (
+        {ORIGIN_COMPOUNDS.map(([eq, res, py, ja, note]) => (
           <div key={res + eq} style={S.charRow}>
-            <span style={{ fontFamily: lv.font, fontSize: 20, minWidth: 118, color: T.inkGrey }}>{eq}</span>
+            <span style={{ fontFamily: lv.font, fontSize: 20, minWidth: 110, color: T.inkGrey }}>{eq}</span>
             <span style={{ color: T.gold, fontSize: 18 }}>→</span>
-            <span style={{ fontFamily: lv.font, fontSize: 28, minWidth: 62 }}>{res}</span>
-            <span style={{ fontSize: 12, color: T.inkGrey, flex: 1 }}>{note}</span>
+            <span style={{ fontFamily: lv.font, fontSize: 26, minWidth: 74 }}>{res}</span>
+            <span style={{ fontSize: 12, color: T.inkGrey, flex: 1 }}>
+              <span style={{ color: T.ink }}>中 {py}</span>{"  "}·{"  "}<span style={{ color: T.ink }}>日 {ja}</span>
+              <span style={{ display: "block" }}>{note}</span>
+            </span>
           </div>
         ))}
       </div>
@@ -1446,7 +1450,8 @@ function Origins({ langKey, onBack }) {
           </div>
         ))}
         <div style={{ fontSize: 13, color: T.inkGrey, marginTop: 12, borderTop: "1px dashed rgba(34,30,25,0.2)", paddingTop: 10 }}>
-          4 · Active visualization: when you meet a character, picture its ancient drawing first, then its strokes.
+          Japanese kanji use these same radicals (氵 in 海 umi, 亻 in 休 yasumu, 忄 in 情 jō).
+          <br />4 · Active visualization: when you meet a character, picture its ancient drawing first, then its strokes.
           In any round, tap 🧠 Memory aid for the real components plus a scene built from them.
         </div>
       </div>
